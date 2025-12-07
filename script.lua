@@ -49,79 +49,89 @@ RunService.RenderStepped:Connect(function()
 	hum.WalkSpeed = SpeedEnabled and WalkSpeedValue or 16
 end)
 
-local Tab = Window:CreateTab("🍑 | Farming") -- Title, Image
+-- Create the input box
+local Input = Tab:CreateInput({
+    Name = "Incognito Chat",
+    CurrentValue = "",
+    PlaceholderText = "Type your message here...",
+    RemoveTextAfterFocusLost = false,
+    Flag = "IncognitoInput",
+    Callback = function(Text)
+        if Text == "" then return end
 
--- Services
-local Players = game:GetService("Players")
-local player = Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local hrp = character:WaitForChild("HumanoidRootPart")
+        local char = Player.Character or Player.CharacterAdded:Wait()
+        local hrp = char:WaitForChild("HumanoidRootPart")
 
--- Configuration
-local plantBoxFolder = workspace.PlantBoxes
-local fruitName = "Bloodfruit"
-local plantRange = 5
-local godHoeName = "God Hoe" -- Name of the tool that boosts planting
+        -- Remove old BillboardGui if it exists
+        local oldGui = hrp:FindFirstChild("IncognitoChatGui")
+        if oldGui then oldGui:Destroy() end
 
--- Track planted boxes
-local plantedBoxes = {}
+        -- Create new BillboardGui
+        local gui = Instance.new("BillboardGui")
+        gui.Name = "IncognitoChatGui"
+        gui.Adornee = hrp
+        gui.Size = UDim2.new(0, 250, 0, 50)
+        gui.StudsOffset = Vector3.new(0,3,0)
+        gui.AlwaysOnTop = true
+        gui.Parent = hrp
 
--- Function to check if God Hoe is equipped
-local function hasGodHoe()
-    local tool = character:FindFirstChildOfClass("Tool")
-    return tool and tool.Name == godHoeName
-end
+        -- Frame for black background
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(1,0,1,0)
+        frame.BackgroundColor3 = Color3.new(0,0,0) -- black
+        frame.BackgroundTransparency = 0.3 -- slightly see-through
+        frame.Parent = gui
 
--- Function to plant a fruit (only if God Hoe is equipped)
-local function plantFruit(box)
-    if box and box:IsA("BasePart") and not plantedBoxes[box] then
-        if hasGodHoe() then
-            local fruit = Instance.new("Part")
-            fruit.Name = fruitName
-            fruit.Size = Vector3.new(1,1,1)
-            fruit.Position = box.Position + Vector3.new(0,3,0)
-            fruit.Anchored = true
-            fruit.Parent = box
-            plantedBoxes[box] = true
-            print("Planted", fruitName, "at", box.Name, "with God Hoe")
-        end
-    end
-end
+        -- TextLabel
+        local txt = Instance.new("TextLabel")
+        txt.Size = UDim2.new(1,0,1,0)
+        txt.BackgroundTransparency = 1
+        txt.Text = Text
+        txt.TextScaled = true
+        txt.TextColor3 = Color3.fromRGB(255,255,255)
+        txt.Font = Enum.Font.GothamBold
+        txt.Parent = frame
 
--- Get nearest unplanted boxes
-local function getNearestBoxes()
-    local boxes = {}
-    for box in ipairs(plantBoxFolder:GetChildren()) do
-        if box:IsA("BasePart") and not plantedBoxes[box] then
-            table.insert(boxes, box)
-        end
-    end
-    table.sort(boxes, function(a,b)
-        return (hrp.Position - a.Position).Magnitude < (hrp.Position - b.Position).Magnitude
-    end)
-    local nearest = {}
-    for i = 1, math.min(plantRange, #boxes) do
-        table.insert(nearest, boxes[i])
-    end
-    return nearest
-end
+        -- Make draggable
+        local dragging = false
+        local dragInput, mousePos, framePos
 
--- Continuous blatant loop
-spawn(function()
-    while true do
-        local boxes = getNearestBoxes()
-        if #boxes == 0 then
-            plantedBoxes = {} -- Reset if all planted
-        else
-            for box in ipairs(boxes) do
-                if box.Parent then
-                    moveInstant(box.Position) -- Instantly teleport
-                    plantFruit(box) -- Only plants if God Hoe is equipped
-                end
+        frame.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = true
+                mousePos = input.Position
+                framePos = frame.Position
+                input.Changed:Connect(function()
+                    if input.UserInputState == Enum.UserInputState.End then
+                        dragging = false
+                    end
+                end)
             end
-        end
-    end
-end)
+        end)
+
+        frame.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement then
+                dragInput = input
+            end
+        end)
+
+        game:GetService("UserInputService").InputChanged:Connect(function(input)
+            if input == dragInput and dragging then
+                local delta = input.Position - mousePos
+                frame.Position = framePos + UDim2.new(0, delta.X, 0, delta.Y)
+            end
+        end)
+
+        -- Optional: remove after 10 seconds
+        task.spawn(function()
+            wait(10)
+            if gui then gui:Destroy() end
+        end)
+    end,
+})
+
+
+local Tab = Window:CreateTab("🍑 | Farming") -- Title, Image
 
 local Tab = Window:CreateTab("✈️ | Tween") -- Title, Image
 
@@ -218,7 +228,7 @@ local LoopEnabled = false
 
 Tab:CreateSlider({
 	Name = "Tween Speed",
-	Range = {1,21.4},
+	Range = {1,36},
 	Increment = 0.1,
 	CurrentValue = 21.4,
 	Callback = function(v) TweenSpeed = v end
